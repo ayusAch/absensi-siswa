@@ -35,8 +35,10 @@ Route::middleware('auth')->group(function () {
     // Guru Management
     Route::resource('guru', GuruController::class);
 
-    // Rekap & Reports
+    // Rekap Management
     Route::get('/rekap', [RekapController::class, 'index'])->name('rekap.index');
+    Route::get('/rekap/export', [RekapController::class, 'exportPdf'])->name('rekap.export');
+    Route::get('/rekap/kelas/{kelasId}/detail', [RekapController::class, 'detailSiswa'])->name('rekap.detail-siswa');
 
     // Absensi Management
     Route::get('/absensi/scanner', [AbsensiController::class, 'scanner'])->name('absensi.scanner'); // ✅ INI DULUAN
