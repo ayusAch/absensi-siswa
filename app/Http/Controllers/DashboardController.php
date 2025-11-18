@@ -2,10 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Siswa;
 use App\Models\Kelas;
-use App\Models\Guru;
 use App\Models\Absensi;
+use App\Models\Siswa;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 
@@ -13,167 +12,158 @@ class DashboardController extends Controller
 {
     public function index()
     {
-        $user = auth()->user();
-
-        if ($user->isAdmin()) {
-            return $this->adminDashboard();
-        } elseif ($user->isGuru()) {
-        return $this->guruDashboard();
+        // Cek role user
+        if (auth()->user()->isGuru()) {
+            return $this->dashboardGuru();
+        } elseif (auth()->user()->isAdmin()) {
+            return $this->dashboardAdmin();
+        } elseif (auth()->user()->isSiswa()) {
+            return $this->dashboardSiswa();
         }
-        // return $this->siswaDashboard();
 
-        // Default ke admin untuk sekarang
-        return $this->adminDashboard();
+        return view('dashboard');
     }
 
-    private function adminDashboard()
+    private function dashboardGuru()
     {
-        // Basic Statistics untuk ADMIN
-        $totalSiswa = Siswa::count();
-        $totalKelas = Kelas::count();
-        $totalGuru = Guru::count();
+        $guru = auth()->user()->guru;
 
-        // Today's Attendance
-        $tanggalHariIni = now()->toDateString();
-        $hadirHariIni = Absensi::where('tanggal', $tanggalHariIni)
-            ->where('status', 'Hadir')->count();
-        $izinHariIni = Absensi::where('tanggal', $tanggalHariIni)
-            ->where('status', 'Izin')->count();
-        $sakitHariIni = Absensi::where('tanggal', $tanggalHariIni)
-            ->where('status', 'Sakit')->count();
-        $alphaHariIni = $totalSiswa - ($hadirHariIni + $izinHariIni + $sakitHariIni);
+        // Jika guru tidak ditemukan, redirect dengan error
+        if (!$guru) {
+            return redirect()->route('login')->with('error', 'Data guru tidak ditemukan.');
+        }
 
-        // Recent Data untuk ADMIN
-        $siswaTerbaru = Siswa::with('kelas')->latest()->take(5)->get();
-        $absensiTerbaru = Absensi::with(['siswa', 'kelas'])
-            ->latest()
-            ->take(10)
+        $tanggalHariIni = Carbon::today();
+
+        // Ambil kelas yang diampu oleh guru ini
+        $kelasDiampu = Kelas::where('wali_kelas_id', $guru->id)
+            ->withCount('siswa')
+            ->get()
+            ->map(function ($kelas) use ($tanggalHariIni) {
+                // Hitung statistik kehadiran untuk setiap kelas
+                $totalSiswa = $kelas->siswa_count;
+                $hadirHariIni = Absensi::whereHas('siswa', function ($query) use ($kelas) {
+                    $query->where('kelas_id', $kelas->id);
+                })
+                    ->whereDate('created_at', $tanggalHariIni)
+                    ->where('status', 'Hadir')
+                    ->count();
+
+                $tidakHadirHariIni = $totalSiswa - $hadirHariIni;
+                $persentaseHadir = $totalSiswa > 0 ? round(($hadirHariIni / $totalSiswa) * 100, 1) : 0;
+
+                return (object) [
+                    'id' => $kelas->id,
+                    'nama_kelas' => $kelas->nama_kelas,
+                    'siswa_count' => $totalSiswa,
+                    'hadir_hari_ini' => $hadirHariIni,
+                    'tidak_hadir_hari_ini' => $tidakHadirHariIni,
+                    'persentase_hadir' => $persentaseHadir
+                ];
+            });
+
+        // Hitung total siswa di semua kelas yang diampu
+        $totalSiswaDiampu = $kelasDiampu->sum('siswa_count');
+
+        // Statistik kehadiran hari ini untuk semua kelas yang diampu
+        $totalHadirHariIni = Absensi::whereHas('siswa', function ($query) use ($guru) {
+            $query->whereHas('kelas', function ($q) use ($guru) {
+                $q->where('wali_kelas_id', $guru->id);
+            });
+        })
+            ->whereDate('created_at', $tanggalHariIni)
+            ->where('status', 'Hadir')
+            ->count();
+
+        $totalIzinHariIni = Absensi::whereHas('siswa', function ($query) use ($guru) {
+            $query->whereHas('kelas', function ($q) use ($guru) {
+                $q->where('wali_kelas_id', $guru->id);
+            });
+        })
+            ->whereDate('created_at', $tanggalHariIni)
+            ->where('status', 'Izin')
+            ->count();
+
+        $totalSakitHariIni = Absensi::whereHas('siswa', function ($query) use ($guru) {
+            $query->whereHas('kelas', function ($q) use ($guru) {
+                $q->where('wali_kelas_id', $guru->id);
+            });
+        })
+            ->whereDate('created_at', $tanggalHariIni)
+            ->where('status', 'Sakit')
+            ->count();
+
+        $totalAlphaHariIni = $totalSiswaDiampu - ($totalHadirHariIni + $totalIzinHariIni + $totalSakitHariIni);
+
+        // Ambil 10 absensi terbaru dari kelas yang diampu
+        $absensiTerbaru = Absensi::whereHas('siswa', function ($query) use ($guru) {
+            $query->whereHas('kelas', function ($q) use ($guru) {
+                $q->where('wali_kelas_id', $guru->id);
+            });
+        })
+            ->with(['siswa', 'kelas'])
+            ->orderBy('created_at', 'desc')
+            ->limit(10)
             ->get();
-        $kelasList = Kelas::withCount('siswa')->get();
 
-        // Quick Stats untuk ADMIN
-        $qrGenerated = Siswa::whereNotNull('qr_code')->count();
-        $guruAktif = Guru::where('status', 'Aktif')->count();
-        $siswaBaruBulanIni = Siswa::whereMonth('created_at', now()->month)->count();
+        return view('dashboard.guru', compact(
+            'kelasDiampu',
+            'tanggalHariIni',
+            'totalSiswaDiampu',
+            'totalHadirHariIni',
+            'totalIzinHariIni',
+            'totalSakitHariIni',
+            'totalAlphaHariIni',
+            'absensiTerbaru'
+        ));
+    }
 
-        // Top Classes
-        $kelasTerbaik = $this->getTopClasses();
+    private function dashboardAdmin()
+    {
+        // Logika dashboard admin
+        $totalGuru = \App\Models\Guru::count();
+        $totalSiswa = \App\Models\Siswa::count();
+        $totalKelas = \App\Models\Kelas::count();
 
-        // Monthly Statistics
-        $statistikBulanan = $this->getMonthlyStatistics();
-
-        // Chart Data
-        $chartData = $this->getAttendanceChartData();
+        $tanggalHariIni = Carbon::today();
+        $totalAbsensiHariIni = Absensi::whereDate('created_at', $tanggalHariIni)->count();
 
         return view('dashboard.admin', compact(
+            'totalGuru',
             'totalSiswa',
             'totalKelas',
-            'totalGuru',
-            'hadirHariIni',
-            'izinHariIni',
-            'sakitHariIni',
-            'alphaHariIni',
-            'siswaTerbaru',
-            'absensiTerbaru',
-            'kelasList',
-            'qrGenerated',
-            'guruAktif',
-            'siswaBaruBulanIni',
-            'kelasTerbaik',
-            'statistikBulanan',
-            'chartData',
+            'totalAbsensiHariIni',
             'tanggalHariIni'
         ));
     }
 
-    private function getTopClasses()
+    private function dashboardSiswa()
     {
-        $tanggalHariIni = now()->toDateString();
+        // Logika dashboard siswa
+        $siswa = auth()->user()->siswa;
 
-        return Kelas::withCount('siswa')->with('guru')
-            ->get()
-            ->map(function ($kelas) use ($tanggalHariIni) {
-                $totalSiswa = $kelas->siswa_count;
-                $hadir = Absensi::where('kelas_id', $kelas->id)
-                    ->where('tanggal', $tanggalHariIni)
-                    ->where('status', 'Hadir')
-                    ->count();
-
-                $persentase = $totalSiswa > 0 ? round(($hadir / $totalSiswa) * 100, 1) : 0;
-
-                return [
-                    'nama_kelas' => $kelas->nama_kelas,
-                    'total_siswa' => $totalSiswa,
-                    'hadir' => $hadir,
-                    'persentase' => $persentase,
-                    'wali_kelas' => $kelas->waliKelas->nama_lengkap ?? '-'
-                ];
-            })
-            ->sortByDesc('persentase')
-            ->take(3)
-            ->values();
-    }
-
-    private function getMonthlyStatistics()
-    {
-        $startOfMonth = now()->startOfMonth();
-        $endOfMonth = now()->endOfMonth();
-
-        $totalSiswa = Siswa::count();
-        $hariSampaiSekarang = now()->day;
-
-        return [
-            'hari_sampai_sekarang' => $hariSampaiSekarang,
-            'total_hari_sekolah' => $hariSampaiSekarang, // Simplified
-            'hadir_bulan_ini' => Absensi::whereBetween('tanggal', [$startOfMonth, $endOfMonth])
-                ->where('status', 'Hadir')
-                ->count(),
-            'izin_bulan_ini' => Absensi::whereBetween('tanggal', [$startOfMonth, $endOfMonth])
-                ->where('status', 'Izin')
-                ->count(),
-            'sakit_bulan_ini' => Absensi::whereBetween('tanggal', [$startOfMonth, $endOfMonth])
-                ->where('status', 'Sakit')
-                ->count(),
-            'total_kehadiran' => $totalSiswa * $hariSampaiSekarang,
-        ];
-    }
-
-    private function getAttendanceChartData()
-    {
-        $dates = [];
-        $hadirData = [];
-        $totalData = [];
-
-        for ($i = 6; $i >= 0; $i--) {
-            $date = now()->subDays($i)->toDateString();
-            $dates[] = Carbon::parse($date)->format('d M');
-
-            $hadir = Absensi::where('tanggal', $date)
-                ->where('status', 'Hadir')
-                ->count();
-            $hadirData[] = $hadir;
-
-            $total = Siswa::count();
-            $totalData[] = $total;
+        if (!$siswa) {
+            return redirect()->route('login')->with('error', 'Data siswa tidak ditemukan.');
         }
 
-        return [
-            'labels' => $dates,
-            'hadir' => $hadirData,
-            'total' => $totalData,
-        ];
-    }
+        $tanggalHariIni = Carbon::today();
 
-    // Tambahkan method ini di DashboardController
-    private function guruDashboard()
-    {
-        return view('dashboard.guru');
-    }
+        // Ambil absensi siswa hari ini
+        $absensiHariIni = Absensi::where('siswa_id', $siswa->id)
+            ->whereDate('created_at', $tanggalHariIni)
+            ->first();
 
-    // Method untuk siswa (akan dibuat nanti)
-    private function siswaDashboard()
-    {
-        // Akan diimplementasi nanti
-        return view('dashboard.siswa');
+        // Ambil riwayat absensi 7 hari terakhir
+        $riwayatAbsensi = Absensi::where('siswa_id', $siswa->id)
+            ->whereDate('created_at', '>=', Carbon::today()->subDays(7))
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return view('dashboard.siswa', compact(
+            'siswa',
+            'absensiHariIni',
+            'riwayatAbsensi',
+            'tanggalHariIni'
+        ));
     }
 }

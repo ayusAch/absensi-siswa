@@ -17,7 +17,31 @@ class RekapController extends Controller
         $kelasId = $request->get('kelas_id');
         $bulan = $request->get('bulan', now()->format('Y-m'));
 
-        $kelasList = Kelas::withCount('siswa')->get();
+        // Jika user adalah guru, hanya tampilkan kelas yang diampu
+        if (auth()->user()->isGuru()) {
+            $guru = auth()->user()->guru;
+
+            if (!$guru) {
+                return redirect()->route('dashboard')->with('error', 'Data guru tidak ditemukan.');
+            }
+
+            $kelasList = Kelas::where('wali_kelas_id', $guru->id)->withCount('siswa')->get();
+
+            // Validasi jika guru memilih kelas tertentu
+            if ($kelasId) {
+                $kelas = Kelas::where('id', $kelasId)
+                    ->where('wali_kelas_id', $guru->id)
+                    ->first();
+
+                if (!$kelas) {
+                    return redirect()->route('rekap.index')
+                        ->with('error', 'Anda tidak memiliki akses ke kelas ini.');
+                }
+            }
+        } else {
+            // Admin bisa lihat semua kelas
+            $kelasList = Kelas::withCount('siswa')->get();
+        }
 
         // Rekap Harian
         $rekapHarian = $this->getRekapHarian($tanggal, $kelasId);
@@ -26,7 +50,7 @@ class RekapController extends Controller
         $rekapBulanan = $this->getRekapBulanan($bulan, $kelasId);
 
         // Statistik Overview
-        $statistik = $this->getStatistikOverview($tanggal);
+        $statistik = $this->getStatistikOverview($tanggal, $kelasId);
 
         return view('rekap.index', compact(
             'rekapHarian',
@@ -44,7 +68,13 @@ class RekapController extends Controller
      */
     private function getRekapHarian($tanggal, $kelasId = null)
     {
-        $query = Kelas::withCount('siswa');
+        // Jika user adalah guru, hanya tampilkan kelas yang diampu
+        if (auth()->user()->isGuru()) {
+            $guru = auth()->user()->guru;
+            $query = Kelas::where('wali_kelas_id', $guru->id)->withCount('siswa');
+        } else {
+            $query = Kelas::withCount('siswa');
+        }
 
         if ($kelasId) {
             $query->where('id', $kelasId);
@@ -91,7 +121,13 @@ class RekapController extends Controller
         $startDate = Carbon::parse($bulan)->startOfMonth();
         $endDate = Carbon::parse($bulan)->endOfMonth();
 
-        $query = Kelas::withCount('siswa');
+        // Jika user adalah guru, hanya tampilkan kelas yang diampu
+        if (auth()->user()->isGuru()) {
+            $guru = auth()->user()->guru;
+            $query = Kelas::where('wali_kelas_id', $guru->id)->withCount('siswa');
+        } else {
+            $query = Kelas::withCount('siswa');
+        }
 
         if ($kelasId) {
             $query->where('id', $kelasId);
@@ -136,20 +172,44 @@ class RekapController extends Controller
     /**
      * Get statistik overview
      */
-    private function getStatistikOverview($tanggal)
+    private function getStatistikOverview($tanggal, $kelasId = null)
     {
-        $totalSiswa = Siswa::count();
-        $totalKelas = Kelas::count();
+        // Jika user adalah guru, hanya hitung statistik dari kelas yang diampu
+        if (auth()->user()->isGuru()) {
+            $guru = auth()->user()->guru;
+            $kelasIds = Kelas::where('wali_kelas_id', $guru->id)->pluck('id');
 
-        $hadirHariIni = Absensi::where('tanggal', $tanggal)
-            ->where('status', 'Hadir')
-            ->count();
-        $izinHariIni = Absensi::where('tanggal', $tanggal)
-            ->where('status', 'Izin')
-            ->count();
-        $sakitHariIni = Absensi::where('tanggal', $tanggal)
-            ->where('status', 'Sakit')
-            ->count();
+            $totalSiswa = Siswa::whereIn('kelas_id', $kelasIds)->count();
+            $totalKelas = $kelasIds->count();
+
+            $hadirHariIni = Absensi::whereIn('kelas_id', $kelasIds)
+                ->where('tanggal', $tanggal)
+                ->where('status', 'Hadir')
+                ->count();
+            $izinHariIni = Absensi::whereIn('kelas_id', $kelasIds)
+                ->where('tanggal', $tanggal)
+                ->where('status', 'Izin')
+                ->count();
+            $sakitHariIni = Absensi::whereIn('kelas_id', $kelasIds)
+                ->where('tanggal', $tanggal)
+                ->where('status', 'Sakit')
+                ->count();
+        } else {
+            // Admin melihat semua statistik
+            $totalSiswa = Siswa::count();
+            $totalKelas = Kelas::count();
+
+            $hadirHariIni = Absensi::where('tanggal', $tanggal)
+                ->where('status', 'Hadir')
+                ->count();
+            $izinHariIni = Absensi::where('tanggal', $tanggal)
+                ->where('status', 'Izin')
+                ->count();
+            $sakitHariIni = Absensi::where('tanggal', $tanggal)
+                ->where('status', 'Sakit')
+                ->count();
+        }
+
         $alphaHariIni = $totalSiswa - ($hadirHariIni + $izinHariIni + $sakitHariIni);
 
         return [
@@ -191,6 +251,22 @@ class RekapController extends Controller
         $kelasId = $request->get('kelas_id');
         $type = $request->get('type', 'harian');
 
+        // Validasi akses untuk guru
+        if (auth()->user()->isGuru()) {
+            $guru = auth()->user()->guru;
+
+            if ($kelasId) {
+                $kelas = Kelas::where('id', $kelasId)
+                    ->where('wali_kelas_id', $guru->id)
+                    ->first();
+
+                if (!$kelas) {
+                    return redirect()->route('rekap.index')
+                        ->with('error', 'Anda tidak memiliki akses ke kelas ini.');
+                }
+            }
+        }
+
         if ($type === 'harian') {
             $rekap = $this->getRekapHarian($tanggal, $kelasId);
             $title = "Rekap Absensi Harian - " . Carbon::parse($tanggal)->format('d/m/Y');
@@ -212,7 +288,17 @@ class RekapController extends Controller
     {
         $tanggal = $request->get('tanggal', now()->toDateString());
 
-        $kelas = Kelas::with([
+        // Validasi akses untuk guru
+        if (auth()->user()->isGuru()) {
+            $guru = auth()->user()->guru;
+            $kelas = Kelas::where('id', $kelasId)
+                ->where('wali_kelas_id', $guru->id)
+                ->firstOrFail();
+        } else {
+            $kelas = Kelas::findOrFail($kelasId);
+        }
+
+        $kelas->load([
             'siswa' => function ($query) use ($tanggal) {
                 $query->with([
                     'absensi' => function ($q) use ($tanggal) {
@@ -220,7 +306,7 @@ class RekapController extends Controller
                     }
                 ])->orderBy('nama_lengkap');
             }
-        ])->findOrFail($kelasId);
+        ]);
 
         $siswaWithAbsensi = [];
         foreach ($kelas->siswa as $siswa) {

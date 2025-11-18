@@ -42,8 +42,6 @@ class User extends Authenticatable
     {
         return $this->belongsTo(Guru::class);
     }
-
-    // ✅ TAMBAHKAN METHOD INI:
     
     /**
      * Check if user is admin

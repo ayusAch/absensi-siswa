@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\Models\Absensi;
 use App\Models\Siswa;
 use App\Models\Kelas;
+use Carbon\Carbon;
 
 class AbsensiController extends Controller
 {
@@ -14,11 +15,30 @@ class AbsensiController extends Controller
      */
     public function index()
     {
-        // Menampilkan semua absensi dengan relasi siswa dan kelas
-        $absensi = Absensi::with(['siswa', 'kelas'])
-            ->orderBy('tanggal', 'desc')
-            ->orderBy('created_at', 'desc')
-            ->paginate(10);
+        // Jika user adalah guru, hanya tampilkan absensi dari kelas yang diampu
+        if (auth()->user()->isGuru()) {
+            $guru = auth()->user()->guru;
+
+            // Pastikan guru ditemukan
+            if (!$guru) {
+                return redirect()->route('dashboard')->with('error', 'Data guru tidak ditemukan.');
+            }
+
+            $absensi = Absensi::whereHas('siswa.kelas', function ($query) use ($guru) {
+                $query->where('wali_kelas_id', $guru->id);
+            })
+                ->with(['siswa', 'kelas'])
+                ->orderBy('tanggal', 'desc')
+                ->orderBy('created_at', 'desc')
+                ->paginate(10);
+        } else {
+            // Admin bisa lihat semua absensi
+            $absensi = Absensi::with(['siswa', 'kelas'])
+                ->orderBy('tanggal', 'desc')
+                ->orderBy('created_at', 'desc')
+                ->paginate(10);
+        }
+
         return view('absensi.index', compact('absensi'));
     }
 
@@ -27,8 +47,23 @@ class AbsensiController extends Controller
      */
     public function create()
     {
-        $siswa = Siswa::with('kelas')->get();
-        return view('absensi.create', compact('siswa'));
+        // Jika user adalah guru, hanya tampilkan kelas yang diampu
+        if (auth()->user()->isGuru()) {
+            $guru = auth()->user()->guru;
+
+            if (!$guru) {
+                return redirect()->route('dashboard')->with('error', 'Data guru tidak ditemukan.');
+            }
+
+            $kelas = Kelas::where('wali_kelas_id', $guru->id)->get();
+            $siswa = Siswa::whereIn('kelas_id', $kelas->pluck('id'))->with('kelas')->get();
+        } else {
+            // Admin bisa lihat semua
+            $kelas = Kelas::all();
+            $siswa = Siswa::with('kelas')->get();
+        }
+
+        return view('absensi.create', compact('siswa', 'kelas'));
     }
 
     /**
@@ -38,9 +73,19 @@ class AbsensiController extends Controller
     {
         $request->validate([
             'siswa_id' => 'required|exists:siswas,id',
-            'kelas_id' => 'required|exists:kelas,id',
             'status' => 'required|in:Hadir,Izin,Sakit,Alpha',
         ]);
+
+        // Validasi tambahan untuk guru - pastikan siswa berasal dari kelas yang diampu
+        if (auth()->user()->isGuru()) {
+            $guru = auth()->user()->guru;
+            $siswa = Siswa::with('kelas')->findOrFail($request->siswa_id);
+
+            if ($siswa->kelas->wali_kelas_id !== $guru->id) {
+                return redirect()->back()
+                    ->with('error', 'Anda tidak memiliki akses untuk melakukan absensi pada siswa ini.');
+            }
+        }
 
         $tanggal = now()->toDateString();
 
@@ -56,12 +101,15 @@ class AbsensiController extends Controller
             return redirect()->back()->with('error', 'Siswa sudah diabsen hari ini');
         }
 
+        // Ambil kelas_id dari siswa
+        $siswa = Siswa::findOrFail($request->siswa_id);
+
         $absensi = Absensi::create([
             'siswa_id' => $request->siswa_id,
-            'kelas_id' => $request->kelas_id,
+            'kelas_id' => $siswa->kelas_id,
             'tanggal' => $tanggal,
             'status' => $request->status,
-            'waktu_absen' => now(), // Tambahkan timestamp absensi
+            'waktu_absen' => now(),
         ]);
 
         if ($request->expectsJson()) {
@@ -80,6 +128,16 @@ class AbsensiController extends Controller
     public function show($id)
     {
         $absensi = Absensi::with(['siswa', 'kelas'])->findOrFail($id);
+
+        // Validasi untuk guru - pastikan absensi berasal dari kelas yang diampu
+        if (auth()->user()->isGuru()) {
+            $guru = auth()->user()->guru;
+            if ($absensi->kelas->wali_kelas_id !== $guru->id) {
+                return redirect()->route('absensi.index')
+                    ->with('error', 'Anda tidak memiliki akses untuk melihat absensi ini.');
+            }
+        }
+
         return view('absensi.show', compact('absensi'));
     }
 
@@ -88,16 +146,25 @@ class AbsensiController extends Controller
      */
     public function destroy($id)
     {
-        $absensi = Absensi::findOrFail($id);
+        $absensi = Absensi::with('kelas')->findOrFail($id);
+
+        // Validasi untuk guru - pastikan absensi berasal dari kelas yang diampu
+        if (auth()->user()->isGuru()) {
+            $guru = auth()->user()->guru;
+            if ($absensi->kelas->wali_kelas_id !== $guru->id) {
+                return redirect()->route('absensi.index')
+                    ->with('error', 'Anda tidak memiliki akses untuk menghapus absensi ini.');
+            }
+        }
+
         $absensi->delete();
 
         return redirect()->route('absensi.index')->with('success', 'Absensi berhasil dihapus');
     }
 
     /**
-     * NEW METHOD: Scan QR Code untuk absensi
+     * Scan QR Code untuk absensi
      */
-
     public function scanQrCode(Request $request)
     {
         try {
@@ -123,6 +190,17 @@ class AbsensiController extends Controller
                     'success' => false,
                     'message' => 'Siswa tidak ditemukan dengan ID: ' . $siswaId
                 ], 404);
+            }
+
+            // Validasi untuk guru - pastikan siswa berasal dari kelas yang diampu
+            if (auth()->user()->isGuru()) {
+                $guru = auth()->user()->guru;
+                if ($siswa->kelas->wali_kelas_id !== $guru->id) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Anda tidak memiliki akses untuk melakukan absensi pada siswa ini.'
+                    ], 403);
+                }
             }
 
             $tanggal = now()->toDateString();
@@ -161,7 +239,6 @@ class AbsensiController extends Controller
             ]);
 
         } catch (\Exception $e) {
-            // Pastikan selalu return JSON bahkan ketika error
             return response()->json([
                 'success' => false,
                 'message' => 'Terjadi kesalahan server: ' . $e->getMessage()
@@ -170,7 +247,7 @@ class AbsensiController extends Controller
     }
 
     /**
-     * NEW METHOD: Halaman scanner QR Code
+     * Halaman scanner QR Code
      */
     public function scanner()
     {
@@ -178,19 +255,44 @@ class AbsensiController extends Controller
     }
 
     /**
-     * NEW METHOD: Rekap absensi harian
+     * Rekap absensi harian
      */
     public function rekapHarian(Request $request)
     {
         $tanggal = $request->get('tanggal', now()->toDateString());
 
-        $absensi = Absensi::with(['siswas', 'kelas'])
-            ->where('tanggal', $tanggal)
-            ->orderBy('kelas_id')
-            ->orderBy('siswa_id')
-            ->get();
+        // Jika user adalah guru, hanya tampilkan kelas yang diampu
+        if (auth()->user()->isGuru()) {
+            $guru = auth()->user()->guru;
 
-        $totalSiswa = Siswa::count();
+            if (!$guru) {
+                return redirect()->route('dashboard')->with('error', 'Data guru tidak ditemukan.');
+            }
+
+            $kelas = Kelas::where('wali_kelas_id', $guru->id)->get();
+            $kelasIds = $kelas->pluck('id');
+
+            $absensi = Absensi::with(['siswa', 'kelas'])
+                ->whereIn('kelas_id', $kelasIds)
+                ->where('tanggal', $tanggal)
+                ->orderBy('kelas_id')
+                ->orderBy('siswa_id')
+                ->get();
+
+            $totalSiswa = Siswa::whereIn('kelas_id', $kelasIds)->count();
+
+        } else {
+            // Admin bisa lihat semua
+            $kelas = Kelas::all();
+            $absensi = Absensi::with(['siswa', 'kelas'])
+                ->where('tanggal', $tanggal)
+                ->orderBy('kelas_id')
+                ->orderBy('siswa_id')
+                ->get();
+
+            $totalSiswa = Siswa::count();
+        }
+
         $hadir = $absensi->where('status', 'Hadir')->count();
         $izin = $absensi->where('status', 'Izin')->count();
         $sakit = $absensi->where('status', 'Sakit')->count();
@@ -203,15 +305,28 @@ class AbsensiController extends Controller
             'izin',
             'sakit',
             'alpha',
-            'totalSiswa'
+            'totalSiswa',
+            'kelas'
         ));
     }
 
     /**
-     * NEW METHOD: Get siswa by kelas untuk dropdown
+     * Get siswa by kelas untuk dropdown
      */
     public function getSiswaByKelas($kelasId)
     {
+        // Validasi untuk guru - pastikan kelas yang diakses adalah kelas yang diampu
+        if (auth()->user()->isGuru()) {
+            $guru = auth()->user()->guru;
+            $kelas = Kelas::where('id', $kelasId)
+                ->where('wali_kelas_id', $guru->id)
+                ->first();
+
+            if (!$kelas) {
+                return response()->json(['error' => 'Akses ditolak'], 403);
+            }
+        }
+
         $siswa = Siswa::where('kelas_id', $kelasId)->get();
         return response()->json($siswa);
     }

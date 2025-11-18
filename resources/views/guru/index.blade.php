@@ -7,7 +7,7 @@
             <div class="flex justify-between items-start">
                 <div>
                     <h1 class="text-3xl font-bold text-gray-800 dark:text-white">Manajemen Guru</h1>
-                    <p class="text-gray-600 dark:text-gray-400 mt-2">Kelola data guru dan wali kelas</p>
+                    <p class="text-gray-600 dark:text-gray-400 mt-2">Kelola data guru dan akun user guru</p>
                 </div>
                 <a href="{{ route('guru.create') }}"
                     class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg flex items-center transition duration-200">
@@ -35,7 +35,7 @@
         @endif
 
         <!-- Statistik -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
             <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border-l-4 border-blue-500">
                 <div class="flex justify-between items-center">
                     <div>
@@ -74,8 +74,7 @@
                     <div>
                         <p class="text-sm text-gray-600 dark:text-gray-400">Wali Kelas</p>
                         <p class="text-2xl font-bold text-gray-800 dark:text-white">
-                            {{-- Anda perlu menambahkan logika untuk menghitung jumlah wali kelas --}}
-                            {{ $gurus->where('is_wali_kelas', true)->count() ?? 0 }}
+                            {{ $gurus->filter(function($guru) { return $guru->kelas->count() > 0; })->count() }}
                         </p>
                     </div>
                     <div class="bg-purple-100 dark:bg-purple-900 p-3 rounded-full">
@@ -88,6 +87,23 @@
                     </div>
                 </div>
             </div>
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border-l-4 border-orange-500">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <p class="text-sm text-gray-600 dark:text-gray-400">Akun User</p>
+                        <p class="text-2xl font-bold text-gray-800 dark:text-white">
+                            {{ $gurus->where('user', '!=', null)->count() }}
+                        </p>
+                    </div>
+                    <div class="bg-orange-100 dark:bg-orange-900 p-3 rounded-full">
+                        <svg class="w-6 h-6 text-orange-600 dark:text-orange-400" fill="none" stroke="currentColor"
+                            viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
+                        </svg>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- Tabel Guru -->
@@ -95,6 +111,9 @@
             <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
                 <div class="flex justify-between items-center">
                     <h2 class="text-lg font-semibold text-gray-800 dark:text-white">Daftar Guru</h2>
+                    <div class="text-sm text-gray-600 dark:text-gray-400">
+                        Total: {{ $gurus->count() }} guru
+                    </div>
                 </div>
             </div>
 
@@ -102,32 +121,28 @@
                 <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-600">
                     <thead class="bg-gray-50 dark:bg-gray-700">
                         <tr>
-                            <th
-                                class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                 No
                             </th>
-                            <th
-                                class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                 Nama Guru
                             </th>
-                            <th
-                                class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                 NIP
                             </th>
-                            <th
-                                class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                 Email
                             </th>
-                            <th
-                                class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                 Jenis Kelamin
                             </th>
-                            <th
-                                class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                 Status
                             </th>
-                            <th
-                                class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                User Account
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                 Aksi
                             </th>
                         </tr>
@@ -141,7 +156,8 @@
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     <div class="text-sm font-medium text-gray-900 dark:text-white">{{ $guru->nama_lengkap }}
                                     </div>
-                                    <div class="text-sm text-gray-500 dark:text-gray-400">{{ $guru->no_telepon }}</div>
+                                    <div class="text-sm text-gray-500 dark:text-gray-400">{{ $guru->no_telepon ?? '-' }}
+                                    </div>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">
                                     @if($guru->nip)
@@ -157,11 +173,27 @@
                                     {{ $guru->jenis_kelamin }}
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap">
-                                    <span
-                                        class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium 
-                                                        {{ $guru->status == 'Aktif' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' }}">
+                                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium 
+                                        {{ $guru->status == 'Aktif' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' }}">
                                         {{ $guru->status }}
                                     </span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    @if($guru->user)
+                                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                            </svg>
+                                            Aktif
+                                        </span>
+                                        @else
+                                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">
+                                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                            </svg>
+                                            Belum Ada
+                                        </span>
+                                    @endif
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                     <div class="flex space-x-2">
@@ -183,6 +215,29 @@
                                             </svg>
                                             Edit
                                         </a>
+                                        <!-- Tombol User Management -->
+                                        @if($guru->user)
+                                            <a href="{{ route('guru.edit-user', $guru->id) }}"
+                                                class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm transition duration-200 flex items-center"
+                                                title="Edit User Account">
+                                                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                        d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                                </svg>
+                                                Edit User
+                                            </a>
+                                        @else
+                                            <a href="{{ route('guru.create-user', $guru->id) }}"
+                                                class="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-sm transition duration-200 flex items-center"
+                                                title="Buat User Account">
+                                                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                        d="M12 4v16m8-8H4" />
+                                                </svg>
+                                                Buat User
+                                            </a>
+                                        @endif
+                                        
                                         <form action="{{ route('guru.destroy', $guru->id) }}" method="POST"
                                             onsubmit="return confirm('Apakah yakin ingin menghapus guru {{ $guru->nama_lengkap }}?');"
                                             class="inline-block">
@@ -202,7 +257,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="7" class="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
+                                <td colspan="8" class="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
                                     <div class="py-12">
                                         <svg class="w-16 h-16 mx-auto text-gray-400 dark:text-gray-600" fill="none"
                                             stroke="currentColor" viewBox="0 0 24 24">
