@@ -90,7 +90,7 @@ class DashboardController extends Controller
     {
         $tanggalHariIni = now()->toDateString();
 
-        return Kelas::withCount('siswa')->with('waliKelas')
+        return Kelas::withCount('siswa')->with('guru')
             ->get()
             ->map(function ($kelas) use ($tanggalHariIni) {
                 $totalSiswa = $kelas->siswa_count;

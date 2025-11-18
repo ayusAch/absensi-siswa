@@ -1,6 +1,25 @@
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 
+<!-- Scripts -->
+@vite(['resources/css/app.css', 'resources/js/app.js'])
+
+{{-- DEBUG SCRIPT --}}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        console.log('=== GLOBAL DEBUG ===');
+
+        // Override semua event listener yang mungkin memblokir
+        const originalAddEventListener = EventTarget.prototype.addEventListener;
+        EventTarget.prototype.addEventListener = function (type, listener, options) {
+            if (type === 'click' && this.id === 'startScannerBtn') {
+                console.log('🔍 Event listener ditambahkan ke startScannerBtn:', listener);
+            }
+            return originalAddEventListener.call(this, type, listener, options);
+        };
+    });
+</script>
+
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">

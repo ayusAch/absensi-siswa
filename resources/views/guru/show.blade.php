@@ -46,7 +46,8 @@
                                     <label class="block text-sm font-medium text-gray-600 dark:text-gray-400">Nama
                                         Lengkap</label>
                                     <p class="mt-1 text-lg font-semibold text-gray-800 dark:text-white">
-                                        {{ $guru->nama_lengkap }}</p>
+                                        {{ $guru->nama_lengkap }}
+                                    </p>
                                 </div>
 
                                 <div>
@@ -89,7 +90,7 @@
                                     <label class="block text-sm font-medium text-gray-600 dark:text-gray-400">Status</label>
                                     <span
                                         class="mt-1 inline-flex items-center px-3 py-1 rounded-full text-xs font-medium 
-                                            {{ $guru->status == 'Aktif' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' }}">
+                                                {{ $guru->status == 'Aktif' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' }}">
                                         {{ $guru->status }}
                                     </span>
                                 </div>
@@ -153,13 +154,17 @@
                         @if($guru->kelas && $guru->kelas->count() > 0)
                             <div class="space-y-3">
                                 @foreach($guru->kelas as $kelas)
+                                    @php
+                                        // Load count siswa untuk kelas ini
+                                        $kelas->loadCount('siswa');
+                                    @endphp
                                     <div
                                         class="flex justify-between items-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-100 dark:border-blue-800">
                                         <span
                                             class="text-sm font-medium text-blue-800 dark:text-blue-300">{{ $kelas->nama_kelas }}</span>
                                         <span
                                             class="text-xs text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-800 px-2 py-1 rounded-full">
-                                            {{ $kelas->siswa_count ?? 0 }} siswa
+                                            {{ $kelas->siswa_count }} siswa
                                         </span>
                                     </div>
                                 @endforeach

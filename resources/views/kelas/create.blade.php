@@ -78,16 +78,20 @@
 
                             <!-- Wali Kelas -->
                             <div>
-                                <label for="wali_kelas"
+                                <label for="wali_kelas_id"
                                     class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                                     Wali Kelas
                                 </label>
-                                <input type="text" name="wali_kelas" id="wali_kelas" value="{{ old('wali_kelas') }}"
-                                    class="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white transition duration-200"
-                                    placeholder="Nama lengkap wali kelas">
-                                <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">bisa diisi nanti</p>
+                                <select name="wali_kelas_id" id="wali_kelas_id"
+                                    class="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white transition duration-200">
+                                    <option value="">-- Pilih Wali Kelas --</option>
+                                    @foreach($gurus as $guru)
+                                        <option value="{{ $guru->id }}" {{ old('wali_kelas_id') == $guru->id ? 'selected' : '' }}>
+                                            {{ $guru->nama_lengkap }}
+                                        </option>
+                                    @endforeach
+                                </select>
                             </div>
-
                             <!-- Tahun Ajaran -->
                             <div>
                                 <label for="tahun_ajaran"
