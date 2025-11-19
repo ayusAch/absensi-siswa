@@ -43,19 +43,6 @@
                     </div>
                 </div>
             </div>
-
-            <!-- QR Generated -->
-            <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border-l-4 border-yellow-500">
-                <div class="flex justify-between items-center">
-                    <div>
-                        <p class="text-sm text-gray-600 dark:text-gray-400">Barcode</p>
-                        <p class="text-2xl font-bold text-gray-800 dark:text-white">{{ $qrGenerated }}</p>
-                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                            {{ $totalSiswa > 0 ? round(($qrGenerated / $totalSiswa) * 100, 1) : 0 }}% 
-                        </p>
-                    </div>
-                </div>
-            </div>
         </div>
     </div>
 @endsection

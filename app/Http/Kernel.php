@@ -44,7 +44,6 @@ class Kernel extends HttpKernel
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
         ],
 
-        // Tambahkan group khusus guru
         'guru' => [
             \App\Http\Middleware\Authenticate::class,
             \App\Http\Middleware\EnsureUserIsGuru::class,
@@ -71,7 +70,7 @@ class Kernel extends HttpKernel
         'throttle' => \Illuminate\Routing\Middleware\ThrottleRequests::class,
         'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
 
-
+        // PASTIKAN INI PERSIS SEPERTI INI:
         'role' => \App\Http\Middleware\CheckRole::class,
         'user.guru' => \App\Http\Middleware\EnsureUserIsGuru::class,
     ];
