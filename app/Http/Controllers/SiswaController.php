@@ -3,7 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\Siswa;
+use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use BaconQrCode\Renderer\ImageRenderer;
 use BaconQrCode\Renderer\Image\ImagickImageBackEnd;
 use BaconQrCode\Renderer\RendererStyle\RendererStyle;
@@ -16,10 +19,14 @@ class SiswaController extends Controller
      */
     public function index()
     {
+        // GANTI: Pakai manual loading dulu
         $siswa = Siswa::with('kelas')->get();
+
+        // Manual load user untuk setiap siswa
+        $siswa->load('user');
+
         return view('siswa.index', compact('siswa'));
     }
-
     /**
      * Show the form for creating a new resource.
      */
@@ -50,7 +57,7 @@ class SiswaController extends Controller
 
         // Generate QR Code menggunakan Bacon QR Code
         $qrCodeData = $this->generateQrCode($siswa->id);
-        
+
         // Update database siswa dengan QR code base64
         $siswa->update([
             'qr_code' => $qrCodeData
@@ -67,19 +74,18 @@ class SiswaController extends Controller
     {
         try {
             $data = "SISWA:" . $siswaId;
-            
+
             $renderer = new ImageRenderer(
-                new RendererStyle(200), // size
+                new RendererStyle(200),
                 new ImagickImageBackEnd()
             );
-            
+
             $writer = new Writer($renderer);
             $qrCodeImage = $writer->writeString($data);
-            
+
             return 'data:image/png;base64,' . base64_encode($qrCodeImage);
-            
+
         } catch (\Exception $e) {
-            // Fallback jika Imagick tidak tersedia
             return $this->generateQrCodeSimple($siswaId);
         }
     }
@@ -90,16 +96,12 @@ class SiswaController extends Controller
     private function generateQrCodeSimple($siswaId)
     {
         $data = "SISWA:" . $siswaId;
-        
-        // Simple QR code generation tanpa library complex
-        // Atau bisa menggunakan Google Charts API sebagai fallback
         $url = "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=" . urlencode($data);
-        
+
         try {
             $imageContent = file_get_contents($url);
             return 'data:image/png;base64,' . base64_encode($imageContent);
         } catch (\Exception $e) {
-            // Return null jika semua method gagal
             \Log::error('QR Code generation failed: ' . $e->getMessage());
             return null;
         }
@@ -166,10 +168,10 @@ class SiswaController extends Controller
     public function downloadQrCode($id)
     {
         $siswa = Siswa::findOrFail($id);
-        
+
         $data = "SISWA:" . $siswa->id;
         $url = "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=" . urlencode($data);
-        
+
         try {
             $imageContent = file_get_contents($url);
             $fileName = 'qr-code-' . str_replace(' ', '-', $siswa->nama_lengkap) . '.png';
@@ -177,9 +179,164 @@ class SiswaController extends Controller
             return response($imageContent)
                 ->header('Content-Type', 'image/png')
                 ->header('Content-Disposition', 'attachment; filename="' . $fileName . '"');
-                
+
         } catch (\Exception $e) {
             return redirect()->back()->with('error', 'Gagal mendownload QR Code.');
+        }
+    }
+
+    // ==================== USER MANAGEMENT METHODS ====================
+
+    /**
+     * Create user account for siswa
+     */
+    public function createUser(Siswa $siswa)
+    {
+        // Cek apakah sudah ada user untuk siswa ini
+        if ($siswa->user) {
+            return redirect()->route('siswa.index') // PERBAIKI: redirect ke index
+                ->with('error', 'Siswa ini sudah memiliki akun user.');
+        }
+
+        return view('siswa.create-user', compact('siswa'));
+    }
+
+    /**
+     * Store user account for siswa
+     */
+    public function storeUser(Request $request, Siswa $siswa)
+    {
+        // Validasi
+        $request->validate([
+            'email' => 'required|email|unique:users,email',
+            'password' => 'required|min:8|confirmed',
+        ]);
+
+        try {
+            // Buat user
+            $user = User::create([
+                'name' => $siswa->nama_lengkap,
+                'email' => $request->email,
+                'password' => Hash::make($request->password),
+                'role' => 'siswa',
+                'siswa_id' => $siswa->id,
+            ]);
+
+            return redirect()->route('siswa.index') // PERBAIKI: redirect ke index
+                ->with('success', 'Akun user berhasil dibuat untuk siswa ' . $siswa->nama_lengkap);
+
+        } catch (\Exception $e) {
+            return redirect()->back()
+                ->with('error', 'Gagal membuat akun: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Edit user account for siswa
+     */
+    public function editUser(Siswa $siswa)
+    {
+        if (!$siswa->user) {
+            return redirect()->route('siswa.index') // PERBAIKI: redirect ke index
+                ->with('error', 'Siswa ini belum memiliki akun user.');
+        }
+
+        return view('siswa.edit-user', compact('siswa'));
+    }
+
+    /**
+     * Update user account for siswa
+     */
+    public function updateUser(Request $request, Siswa $siswa)
+    {
+        if (!$siswa->user) {
+            return redirect()->route('siswa.index') // PERBAIKI: redirect ke index
+                ->with('error', 'Siswa ini belum memiliki akun user.');
+        }
+
+        $request->validate([
+            'email' => 'required|email|unique:users,email,' . $siswa->user->id,
+            'password' => 'nullable|min:8|confirmed',
+        ]);
+
+        try {
+            $updateData = [
+                'name' => $siswa->nama_lengkap,
+                'email' => $request->email,
+            ];
+
+            if ($request->password) {
+                $updateData['password'] = Hash::make($request->password);
+            }
+
+            $siswa->user->update($updateData);
+
+            return redirect()->route('siswa.index') // PERBAIKI: redirect ke index
+                ->with('success', 'Akun user berhasil diupdate untuk siswa ' . $siswa->nama_lengkap);
+
+        } catch (\Exception $e) {
+            return redirect()->back()
+                ->with('error', 'Gagal update akun: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Destroy user account for siswa
+     */
+    public function destroyUser(Siswa $siswa)
+    {
+        if (!$siswa->user) {
+            return redirect()->route('siswa.index') // PERBAIKI: redirect ke index
+                ->with('error', 'Siswa ini belum memiliki akun user.');
+        }
+
+        try {
+            $siswa->user->delete();
+
+            return redirect()->route('siswa.index') // PERBAIKI: redirect ke index
+                ->with('success', 'Akun user berhasil dihapus untuk siswa ' . $siswa->nama_lengkap);
+
+        } catch (\Exception $e) {
+            return redirect()->route('siswa.index') // PERBAIKI: redirect ke index
+                ->with('error', 'Gagal menghapus akun: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Generate random password for siswa
+     */
+    public function generatePassword(Siswa $siswa)
+    {
+        $randomPassword = Str::random(8);
+
+        try {
+            if ($siswa->user) {
+                // Update password existing user
+                $siswa->user->update([
+                    'password' => Hash::make($randomPassword)
+                ]);
+            } else {
+                // Buat user baru
+                $user = User::create([
+                    'name' => $siswa->nama_lengkap,
+                    'email' => $siswa->email ?? strtolower(str_replace(' ', '.', $siswa->nama_lengkap)) . '@siswa.school.id',
+                    'password' => Hash::make($randomPassword),
+                    'role' => 'siswa',
+                    'siswa_id' => $siswa->id,
+                ]);
+            }
+
+            return response()->json([
+                'success' => true,
+                'password' => $randomPassword,
+                'message' => 'Password berhasil digenerate'
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal generate password: ' . $e->getMessage()
+            ], 500);
         }
     }
 }

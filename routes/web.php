@@ -30,8 +30,16 @@ Route::middleware('auth')->group(function () {
 
         // Siswa routes 
         Route::resource('siswa', SiswaController::class);
-        Route::get('/siswa/{id}/download-qr', [SiswaController::class, 'downloadQrCode'])->name('siswa.download.qr');
-        Route::get('/siswa/{id}/regenerate-qr', [SiswaController::class, 'regenerateQrCode'])->name('siswa.regenerate.qr');
+        Route::get('/siswa/{siswa}/download-qr', [SiswaController::class, 'downloadQrCode'])->name('siswa.download.qr');
+        Route::get('/siswa/{siswa}/regenerate-qr', [SiswaController::class, 'regenerateQrCode'])->name('siswa.regenerate.qr');
+
+        // User management untuk siswa - PASTIKAN DI DALAM GROUP ADMIN
+        Route::get('/siswa/{siswa}/create-user', [SiswaController::class, 'createUser'])->name('siswa.create-user');
+        Route::post('/siswa/{siswa}/store-user', [SiswaController::class, 'storeUser'])->name('siswa.store-user');
+        Route::get('/siswa/{siswa}/edit-user', [SiswaController::class, 'editUser'])->name('siswa.edit-user');
+        Route::put('/siswa/{siswa}/update-user', [SiswaController::class, 'updateUser'])->name('siswa.update-user');
+        Route::delete('/siswa/{siswa}/destroy-user', [SiswaController::class, 'destroyUser'])->name('siswa.destroy-user');
+        Route::post('/siswa/{siswa}/generate-password', [SiswaController::class, 'generatePassword'])->name('siswa.generate-password');
 
         // Guru routes
         Route::resource('guru', GuruController::class);
@@ -65,6 +73,13 @@ Route::middleware('auth')->group(function () {
             Route::get('/export', [RekapController::class, 'exportPdf'])->name('rekap.export');
             Route::get('/kelas/{kelasId}/detail', [RekapController::class, 'detailSiswa'])->name('rekap.detail-siswa');
         });
+    });
+
+    // ==================== SISWA ROUTES (READ ONLY) ====================
+    Route::middleware(['auth', 'can:siswa'])->group(function () {
+        // Nanti kita tambahkan routes untuk siswa di sini
+        // Route::get('/siswa-profile', [SiswaController::class, 'profile'])->name('siswa.profile');
+        // Route::get('/siswa-absensi', [AbsensiController::class, 'riwayatPribadi'])->name('siswa.absensi.riwayat');
     });
 });
 

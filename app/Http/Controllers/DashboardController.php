@@ -137,33 +137,44 @@ class DashboardController extends Controller
         ));
     }
 
+    /**
+     * Dashboard untuk siswa
+     */
+
     private function dashboardSiswa()
     {
-        // Logika dashboard siswa
-        $siswa = auth()->user()->siswa;
+        // PERBAIKI: Load relasi dengan foreign key yang benar
+        $siswa = auth()->user()->siswa->load(['kelas.guru']);
 
-        if (!$siswa) {
-            return redirect()->route('login')->with('error', 'Data siswa tidak ditemukan.');
+        $startOfMonth = now()->startOfMonth();
+        $endOfMonth = now()->endOfMonth();
+
+        $statistikBulanan = \App\Models\Absensi::where('siswa_id', $siswa->id)
+            ->whereBetween('tanggal', [$startOfMonth, $endOfMonth])
+            ->selectRaw('status, COUNT(*) as total')
+            ->groupBy('status')
+            ->pluck('total', 'status');
+
+        $totalHariAktif = $this->getHariAktifInMonth();
+
+        return view('dashboard.siswa', compact('statistikBulanan', 'totalHariAktif', 'siswa'));
+    }
+
+    /**
+     * Hitung total hari aktif (senin-jumat) dalam bulan berjalan
+     */
+    private function getHariAktifInMonth()
+    {
+        $start = now()->startOfMonth();
+        $end = now()->endOfMonth();
+        $total = 0;
+
+        for ($date = $start; $date->lte($end); $date->addDay()) {
+            if ($date->isWeekday()) { // Senin-Jumat
+                $total++;
+            }
         }
 
-        $tanggalHariIni = Carbon::today();
-
-        // Ambil absensi siswa hari ini
-        $absensiHariIni = Absensi::where('siswa_id', $siswa->id)
-            ->whereDate('created_at', $tanggalHariIni)
-            ->first();
-
-        // Ambil riwayat absensi 7 hari terakhir
-        $riwayatAbsensi = Absensi::where('siswa_id', $siswa->id)
-            ->whereDate('created_at', '>=', Carbon::today()->subDays(7))
-            ->orderBy('created_at', 'desc')
-            ->get();
-
-        return view('dashboard.siswa', compact(
-            'siswa',
-            'absensiHariIni',
-            'riwayatAbsensi',
-            'tanggalHariIni'
-        ));
+        return $total;
     }
 }

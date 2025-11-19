@@ -48,6 +48,9 @@
                                 Jenis Kelamin</th>
                             <th
                                 class="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                Status User</th> <!-- TAMBAH INI -->
+                            <th
+                                class="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                 Barcode</th>
                             <th
                                 class="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
@@ -64,15 +67,37 @@
                                 <td class="px-6 py-4 whitespace-nowrap text-gray-700 dark:text-gray-300">
                                     <span
                                         class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                                        {{ $s->kelas->nama_kelas }}
+                                        {{ $s->kelas->nama_kelas ?? '-' }}
                                     </span>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-gray-700 dark:text-gray-300">
                                     <span
                                         class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium 
-                                                {{ $s->jenis_kelamin == 'Laki-laki' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' : 'bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-200' }}">
+                                                        {{ $s->jenis_kelamin == 'Laki-laki' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' : 'bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-200' }}">
                                         {{ $s->jenis_kelamin }}
                                     </span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <!-- STATUS USER -->
+                                    @if($s->user)
+                                        <span
+                                            class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                                            <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M5 13l4 4L19 7" />
+                                            </svg>
+                                            Aktif
+                                        </span>
+                                    @else
+                                        <span
+                                            class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
+                                            <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M6 18L18 6M6 6l12 12" />
+                                            </svg>
+                                            Belum Ada
+                                        </span>
+                                    @endif
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     @if($s->qr_code)
@@ -92,6 +117,27 @@
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     <div class="flex space-x-2">
+                                        <!-- TOMBOL BUAT/EDIT USER -->
+                                        @if($s->user)
+                                            <a href="{{ route('siswa.edit-user', $s) }}"
+                                                class="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-sm transition duration-200 flex items-center">
+                                                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                        d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                                </svg>
+                                                Edit User
+                                            </a>
+                                        @else
+                                            <a href="{{ route('siswa.create-user', $s) }}"
+                                                class="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-sm transition duration-200 flex items-center">
+                                                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                        d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                                </svg>
+                                                Buat User
+                                            </a>
+                                        @endif
+
                                         <a href="{{ route('siswa.show', $s->id) }}"
                                             class="bg-indigo-500 hover:bg-indigo-600 text-white px-3 py-1 rounded text-sm transition duration-200 flex items-center">
                                             <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">

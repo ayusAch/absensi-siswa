@@ -15,14 +15,14 @@ class Siswa extends Model
         'nama_lengkap',
         'kelas_id',
         'jenis_kelamin',
-        'alamat', 
+        'alamat',
         'qr_code',
         'user_id'
     ];
 
     public function user()
     {
-        return $this->belongsTo(User::class);
+        return $this->hasOne(User::class, 'siswa_id'); // SESUAIKAN
     }
 
     public function kelas()
